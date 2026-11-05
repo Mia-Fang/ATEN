@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>暗黑模式审计局 - 注意力实验室 (ZS3Z7F)</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+</head>
+<body>
+
+    <!-- 1. 欢迎与信息登记 -->
+    <div id="screen-welcome" class="container">
+        <h1>🕵️ 暗黑模式审计局</h1>
+        <p>欢迎加入体验官计划。本测试包含两项针对现代 App UI 设计的认知挑战。</p>
+        <div class="form-group">
+            <label>被试姓名/代号：</label>
+            <input type="text" id="input-name" placeholder="请输入您的姓名" required>
+        </div>
+        <p><small>我们将记录您的反应时（RT）以及眼动轨迹。数据仅用于学术分析，全程匿名。</small></p>
+        <label style="display:block; margin: 20px 0;">
+            <input type="checkbox" id="consent"> 我已阅读并同意参与实验
+        </label>
+        <button id="btn-start" disabled>进入眼动仪校准</button>
+    </div>
+
+    <!-- 2. 眼动仪校准 -->
+    <div id="screen-calibration" class="container hidden">
+        <h2>👁️ 眼动仪校准 (Calibration)</h2>
+        <p>请点击屏幕上的 <b>9 个红点</b>，每个点点击 3 次，点击时请务必盯紧该点。</p>
+        <p>进度: <span id="calib-progress">0</span> / 27</p>
+        <div id="calibration-area"></div>
+        <button id="btn-calib-done" class="hidden">校准完成，进入验证</button>
+    </div>
+
+    <!-- 3. 眼动仪验证 -->
+    <div id="screen-validation" class="container hidden">
+        <h2>🎯 眼动仪验证 (Validation)</h2>
+        <p>请将视线集中在出现的 <b>蓝点</b> 上（不需要点击），保持 1.5 秒。</p>
+        <p>进度: <span id="val-progress">1</span> / 5</p>
+        <div id="validation-area"></div>
+        <h2 id="val-result" class="hidden" style="color: var(--success);"></h2>
+        <button id="btn-val-done" class="hidden">进入实验</button>
+    </div>
+
+    <!-- 4. 实验一：视觉搜索 -->
+    <div id="screen-exp1" class="container hidden">
+        <h2>测试一：寻找“拒绝”</h2>
+        <p>请在弹窗中，以最快速度找到并点击 <b>“残忍拒绝”</b>按钮。</p>
+        <p>进度: <span id="exp1-trial">1</span> / 20</p>
+        <div id="exp1-stage"></div>
+    </div>
+
+    <!-- 5. 实验二：UI Stroop -->
+    <div id="screen-exp2" class="container hidden">
+        <h2>测试二：取消订阅</h2>
+        <p>请根据<b>文字内容</b>，点击“确认取消”按钮（<b>绝对忽略按钮的颜色干扰</b>）。</p>
+        <p>进度: <span id="exp2-trial">1</span> / 20</p>
+        <div id="exp2-stage">
+            <button class="choice-btn" id="btn-left"></button>
+            <button class="choice-btn" id="btn-right"></button>
+        </div>
+    </div>
+
+    <!-- 6. 结果与上传 (重度升级) -->
+    <div id="screen-results" class="container hidden" style="max-width: 1100px;">
+        <h2>📊 您的认知审计与眼动追踪报告</h2>
+        <div id="results-dashboard">
+            
+            <div class="data-card">
+                <h3>实验一：视觉搜索 (SEEV 理论)</h3>
+                <div class="stats-grid">
+                    <div>基线 RT: <b id="res-e1-base">-</b> ms</div>
+                    <div>改进 RT: <b id="res-e1-imp">-</b> ms</div>
+                    <div>搜索效应量 (Cohen's d): <b id="res-e1-d" class="highlight">-</b></div>
+                    <div>眼动首次注视目标时间 (TTFF): <b id="res-e1-ttff" class="highlight" style="color: #f1c40f;">-</b> ms</div>
+                </div>
+                <p class="analysis-text" id="res-e1-text"></p>
+            </div>
+
+            <div class="data-card">
+                <h3>实验二：UI Stroop 冲突</h3>
+                <div class="stats-grid">
+                    <div>兼容 RT: <b id="res-e2-comp">-</b> ms</div>
+                    <div>冲突 RT: <b id="res-e2-conf">-</b> ms</div>
+                    <div>Stroop 效应量: <b id="res-e2-effect" class="highlight">-</b> ms</div>
+                    <div>原论文对比: <b id="res-e2-compare">-</b></div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="chartRT"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="chartEye"></canvas>
+            </div>
+
+        </div>
+        <button id="btn-upload">上传数据并结束</button>
+        <p id="upload-status" class="status-text"></p>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
