@@ -74,21 +74,27 @@ dom.btnStart.addEventListener('click', async () => {
 
     try {
         dom.btnStart.innerText = "请求摄像头...";
-        // ... 下面的代码保持不变
 
-    // 先强制切换页面，不管眼动库能不能加载，绝对不卡死！
-    dom.welcome.classList.add('hidden'); 
-    dom.calib.classList.remove('hidden');
-    setupCalibration();
+        // 👇👇👇 核心修复：告诉 WebGazer 去你的本地 models 文件夹找模型 👇👇👇
+        if (window.webgazer && window.webgazer.params) {
+            if (!window.webgazer.params.blazeFace) window.webgazer.params.blazeFace = {};
+            window.webgazer.params.blazeFace.modelUrl = 'models/blazeface/model.json';
+            
+            if (!window.webgazer.params.faceMesh) window.webgazer.params.faceMesh = {};
+            window.webgazer.params.faceMesh.modelUrl = 'models/facemesh/model.json';
+        }
+        // 👆👆👆 核心修复代码结束 👆👆👆
 
-    try {
-        dom.btnStart.innerText = "请求摄像头...";
         webgazer.showVideoPreview(false).showPredictionPoints(false);
         if (typeof webgazer.applyKalmanFilter === 'function') webgazer.applyKalmanFilter(true);
         
+        // 注意看，begin() 在下面这行代码的最末尾
         webgazer.setGazeListener((data) => { 
-            if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
-        }).begin();
+            if (data) {
+                gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
+                gazeTimestamp = performance.now(); 
+            }
+        }).begin(); 
     } catch (err) { 
         console.warn("眼动仪初始化失败，但实验将继续进行。", err); 
     }
