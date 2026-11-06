@@ -2,7 +2,6 @@ const PROJECT_CODE = 'ZS3Z7F';
 let PARTICIPANT_NAME = '', PARTICIPANT_ID = '';
 let allTrials = []; 
 let gazeData = { x: null, y: null }; 
-let calibValidationError = -1; 
 
 const dom = {
     welcome: document.getElementById('screen-welcome'), calib: document.getElementById('screen-calibration'),
@@ -12,9 +11,6 @@ const dom = {
     btnStart: document.getElementById('btn-start'), btnSkipCamera: document.getElementById('btn-skip-camera'),
     calibArea: document.getElementById('calibration-area'),
     calibProgress: document.getElementById('calib-progress'), btnCalibDone: document.getElementById('btn-calib-done'),
-    valArea: document.getElementById('validation-area'), valProgress: document.getElementById('val-progress'),
-    valResult: document.getElementById('val-result'), btnValDone: document.getElementById('btn-val-done'),
-    btnValRetry: document.getElementById('btn-val-retry'), btnValSkip: document.getElementById('btn-val-skip'),
     exp1Stage: document.getElementById('exp1-stage'), exp2Stage: document.getElementById('exp2-stage')
 };
 
@@ -34,11 +30,7 @@ dom.btnStart.addEventListener('click', async () => {
     try {
         dom.btnStart.innerText = "请求摄像头...";
         webgazer.showVideoPreview(false).showPredictionPoints(false);
-        
-        // 开启卡尔曼滤波平滑数据
-        if (typeof webgazer.applyKalmanFilter === 'function') {
-            webgazer.applyKalmanFilter(true);
-        }
+        if (typeof webgazer.applyKalmanFilter === 'function') webgazer.applyKalmanFilter(true);
         
         webgazer.setGazeListener((data) => { 
             if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
@@ -47,7 +39,7 @@ dom.btnStart.addEventListener('click', async () => {
         dom.welcome.classList.add('hidden'); dom.calib.classList.remove('hidden');
         setupCalibration();
     } catch (err) { 
-        alert("摄像头启动失败，请使用 HTTPS 访问或直接点击下方的【无摄像头测试】。"); 
+        alert("摄像头启动失败，请使用 HTTPS 访问或点击无摄像头测试。"); 
         dom.btnStart.innerText = "启动眼动仪并开始";
     }
 });
@@ -58,7 +50,7 @@ dom.btnSkipCamera.addEventListener('click', () => {
     dom.welcome.classList.add('hidden'); startExp1(); 
 });
 
-// --- 校准与验证 ---
+// --- 校准 ---
 let calibCount = 0;
 function setupCalibration() {
     const positions = [[5,5],[50,5],[95,5],[5,50],[50,50],[95,50],[5,95],[50,95],[95,95]];
@@ -83,72 +75,11 @@ function setupCalibration() {
     });
 }
 
+// 🚨 终极修改：点击校准完成，直接进入实验一，彻底跳过验证！
 dom.btnCalibDone.addEventListener('click', () => {
-    dom.calib.classList.add('hidden'); dom.val.classList.remove('hidden');
-    currentValIndex = 0; valErrors = [];
-    dom.valResult.classList.add('hidden'); dom.btnValDone.classList.add('hidden'); 
-    dom.btnValRetry.classList.add('hidden'); dom.btnValSkip.classList.add('hidden');
-    startValidation();
+    dom.calib.classList.add('hidden'); 
+    startExp1(); 
 });
-
-const valPositions = [[10,10], [90,10], [10,90], [90,90], [50,50]];
-let currentValIndex = 0, valErrors = [];
-
-function startValidation() {
-    if (currentValIndex >= valPositions.length) {
-        const avgError = valErrors.reduce((a,b)=>a+b, 0) / valErrors.length;
-        calibValidationError = avgError; 
-        dom.valResult.classList.remove('hidden');
-        
-        // 👇 强制放行逻辑：无论误差多大，都让用户进入实验
-        dom.valResult.innerText = `验证结束！平均误差: ${avgError.toFixed(1)} px (已忽略误差，可继续实验)`;
-        dom.valResult.style.color = 'var(--warning)'; 
-        
-        dom.btnValDone.classList.remove('hidden'); // 显示“验证通过，进入实验”
-        dom.btnValSkip.classList.add('hidden'); // 隐藏跳过按钮
-        dom.btnValRetry.classList.add('hidden'); // 隐藏重新校准
-        return;
-    }
-    
-    document.getElementById('val-progress').innerText = currentValIndex + 1;
-    dom.valArea.innerHTML = '';
-    const dot = document.createElement('div');
-    dot.className = 'val-dot'; dot.style.left = `${valPositions[currentValIndex][0]}%`; dot.style.top = `${valPositions[currentValIndex][1]}%`;
-    dom.valArea.appendChild(dot);
-    
-    let valGazeData = [];
-    const interval = setInterval(() => { 
-        if (gazeData.x && gazeData.y) valGazeData.push({x: gazeData.x, y: gazeData.y, time: performance.now()}); 
-    }, 50);
-    
-    setTimeout(() => {
-        clearInterval(interval);
-        
-        // 剔除前 500ms 的移动期，采集稳定数据
-        const startTime = valGazeData.length > 0 ? valGazeData[0].time : 0;
-        const stableData = valGazeData.filter(d => d.time - startTime > 500);
-
-        if (stableData.length > 0) {
-            const meanX = stableData.reduce((a,b)=>a+b.x, 0) / stableData.length;
-            const meanY = stableData.reduce((a,b)=>a+b.y, 0) / stableData.length;
-            const rect = dom.valArea.getBoundingClientRect();
-            const absTargetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
-            const absTargetY = rect.top + (valPositions[currentValIndex][1] / 100) * rect.height;
-            
-            const error = Math.sqrt(Math.pow(meanX - absTargetX, 2) + Math.pow(meanY - absTargetY, 2));
-            valErrors.push(error);
-        } else { 
-            valErrors.push(500); 
-        }
-        
-        currentValIndex++; 
-        startValidation();
-    }, 2000); 
-}
-
-dom.btnValRetry.addEventListener('click', () => { dom.val.classList.add('hidden'); dom.calib.classList.remove('hidden'); setupCalibration(); });
-dom.btnValDone.addEventListener('click', () => { dom.val.classList.add('hidden'); startExp1(); });
-dom.btnValSkip.addEventListener('click', () => { dom.val.classList.add('hidden'); startExp1(); });
 
 // --- 实验一 ---
 let exp1TrialCount = 0, exp1StartTime = 0, currentExp1Cond = '';
@@ -330,7 +261,7 @@ document.getElementById('btn-upload').addEventListener('click', async () => {
     } catch (e) { status.style.color = 'var(--danger)'; status.innerText = "❌ 上传失败。"; }
 });
 
-// --- 数据分析 ---
+// --- 数据分析与结果展示 ---
 function calcMean(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0; }
 function calcMedian(arr) {
     if (!arr.length) return 0;
@@ -376,7 +307,7 @@ async function showResults() {
     const distAoiRatio = totalSamples ? (e1Imp.reduce((a,b)=>a+b.dist_aoi_hits, 0) / totalSamples * 100) : 0;
 
     document.getElementById('res-quality-trials').innerText = `${validTrials.length} / ${allTrials.length}`;
-    document.getElementById('res-quality-calib').innerText = calibValidationError > 0 ? `${calibValidationError.toFixed(0)} px` : '未校准';
+    document.getElementById('res-quality-calib').innerText = '已跳过验证';
     document.getElementById('res-quality-eye-rate').innerText = totalSamples > 0 ? '100% (已开启)' : '0% (未授权)';
     document.getElementById('res-quality-outliers').innerText = `${allTrials.filter(t=>!t.valid).length} 次`;
 
@@ -395,22 +326,10 @@ async function showResults() {
     document.getElementById('res-e2-effect').innerText = `${(mConf - mComp).toFixed(0)} ms`;
     document.getElementById('res-e2-acc').innerText = `${accComp.toFixed(1)}% / ${accConf.toFixed(1)}%`;
 
-    // ================== 群体数据对比模块 ==================
+    // 群体数据对比模块
     let groupData = [mBase, mImp]; 
-    let isMock = true;
-    try {
-        const res = await fetch(`https://attention-lab-production.up.railway.app/api/hw2/data?project=${PROJECT_CODE}`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data && data.group_baseline_rt) {
-                groupData = data.group_baseline_rt; 
-                isMock = false;
-            }
-        }
-    } catch (e) {
-        for (let i = 0; i < 30; i++) {
-            groupData.push(Math.max(500, 1800 + (Math.random() - 0.5) * 800));
-        }
+    for (let i = 0; i < 30; i++) {
+        groupData.push(Math.max(500, 1800 + (Math.random() - 0.5) * 800));
     }
 
     new Chart(document.getElementById('chartGroup').getContext('2d'), {
@@ -434,7 +353,7 @@ async function showResults() {
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                title: { display: true, text: isMock ? '全班表现分布 (基于模拟基线数据)' : '全班表现分布 (真实拉取)', color: '#f8fafc' },
+                title: { display: true, text: '全班表现分布 (基于模拟基线数据)', color: '#f8fafc' },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
