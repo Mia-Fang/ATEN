@@ -1,7 +1,22 @@
+// 修复 WebGazer 底层 Canvas 性能警告
+(function() {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function(contextType, contextAttributes) {
+        if (contextType === '2d') {
+            contextAttributes = contextAttributes || {};
+            contextAttributes.willReadFrequently = true;
+        }
+        return originalGetContext.call(this, contextType, contextAttributes);
+    };
+})();
+
+// ... 下面是原来的 const PROJECT_CODE = 'ZS3Z7F'; ...
+
 const PROJECT_CODE = 'ZS3Z7F'; 
 let PARTICIPANT_NAME = '', PARTICIPANT_ID = '';
 let allTrials = []; 
 let gazeData = { x: null, y: null }; 
+let calibValidationError = -1; 
 
 const dom = {
     welcome: document.getElementById('screen-welcome'), calib: document.getElementById('screen-calibration'),
@@ -11,6 +26,8 @@ const dom = {
     btnStart: document.getElementById('btn-start'), btnSkipCamera: document.getElementById('btn-skip-camera'),
     calibArea: document.getElementById('calibration-area'),
     calibProgress: document.getElementById('calib-progress'), btnCalibDone: document.getElementById('btn-calib-done'),
+    valArea: document.getElementById('validation-area'), valProgress: document.getElementById('val-progress'),
+    valResult: document.getElementById('val-result'), btnValDone: document.getElementById('btn-val-done'),
     exp1Stage: document.getElementById('exp1-stage'), exp2Stage: document.getElementById('exp2-stage')
 };
 
@@ -75,11 +92,65 @@ function setupCalibration() {
     });
 }
 
-// 🚨 终极修改：点击校准完成，直接进入实验一，彻底跳过验证！
+// 👇 恢复进入验证页
 dom.btnCalibDone.addEventListener('click', () => {
     dom.calib.classList.add('hidden'); 
-    startExp1(); 
+    dom.val.classList.remove('hidden');
+    currentValIndex = 0; valErrors = [];
+    dom.valResult.classList.add('hidden'); dom.btnValDone.classList.add('hidden'); 
+    startValidation();
 });
+
+// --- 验证 (跑完即过) ---
+const valPositions = [[10,10], [90,10], [10,90], [90,90], [50,50]];
+let currentValIndex = 0, valErrors = [];
+
+function startValidation() {
+    if (currentValIndex >= valPositions.length) {
+        const avgError = valErrors.reduce((a,b)=>a+b, 0) / valErrors.length;
+        calibValidationError = avgError; 
+        dom.valResult.classList.remove('hidden');
+        
+        // 强制放行逻辑
+        dom.valResult.innerText = `验证结束！平均误差: ${avgError.toFixed(1)} px (已忽略误差，可继续实验)`;
+        dom.valResult.style.color = 'var(--success)'; 
+        dom.btnValDone.classList.remove('hidden'); // 必定显示进入实验按钮
+        return;
+    }
+    
+    document.getElementById('val-progress').innerText = currentValIndex + 1;
+    dom.valArea.innerHTML = '';
+    const dot = document.createElement('div');
+    dot.className = 'val-dot'; dot.style.left = `${valPositions[currentValIndex][0]}%`; dot.style.top = `${valPositions[currentValIndex][1]}%`;
+    dom.valArea.appendChild(dot);
+    
+    let valGazeData = [];
+    const interval = setInterval(() => { 
+        if (gazeData.x && gazeData.y) valGazeData.push({x: gazeData.x, y: gazeData.y, time: performance.now()}); 
+    }, 50);
+    
+    setTimeout(() => {
+        clearInterval(interval);
+        const startTime = valGazeData.length > 0 ? valGazeData[0].time : 0;
+        const stableData = valGazeData.filter(d => d.time - startTime > 500);
+
+        if (stableData.length > 0) {
+            const meanX = stableData.reduce((a,b)=>a+b.x, 0) / stableData.length;
+            const meanY = stableData.reduce((a,b)=>a+b.y, 0) / stableData.length;
+            const rect = dom.valArea.getBoundingClientRect();
+            const absTargetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
+            const absTargetY = rect.top + (valPositions[currentValIndex][1] / 100) * rect.height;
+            const error = Math.sqrt(Math.pow(meanX - absTargetX, 2) + Math.pow(meanY - absTargetY, 2));
+            valErrors.push(error);
+        } else { 
+            valErrors.push(500); 
+        }
+        currentValIndex++; 
+        startValidation();
+    }, 2000); 
+}
+
+dom.btnValDone.addEventListener('click', () => { dom.val.classList.add('hidden'); startExp1(); });
 
 // --- 实验一 ---
 let exp1TrialCount = 0, exp1StartTime = 0, currentExp1Cond = '';
@@ -239,7 +310,7 @@ function runExp2Trial() {
     exp2StartTime = performance.now();
 }
 
-// --- 数据记录 ---
+// --- 数据记录与上传 ---
 function recordTrialData(data) {
     data.valid = !(data.rt < 150 || data.rt > 10000);
     allTrials.push(data); 
@@ -307,7 +378,7 @@ async function showResults() {
     const distAoiRatio = totalSamples ? (e1Imp.reduce((a,b)=>a+b.dist_aoi_hits, 0) / totalSamples * 100) : 0;
 
     document.getElementById('res-quality-trials').innerText = `${validTrials.length} / ${allTrials.length}`;
-    document.getElementById('res-quality-calib').innerText = '已跳过验证';
+    document.getElementById('res-quality-calib').innerText = calibValidationError > 0 ? `${calibValidationError.toFixed(0)} px` : '未校准';
     document.getElementById('res-quality-eye-rate').innerText = totalSamples > 0 ? '100% (已开启)' : '0% (未授权)';
     document.getElementById('res-quality-outliers').innerText = `${allTrials.filter(t=>!t.valid).length} 次`;
 
@@ -381,7 +452,7 @@ async function showResults() {
                 backgroundColor: ['#64748b', '#ef4444', '#3b82f6', '#8b5cf6'], borderRadius: 6
             }]
         },
-        options: { responsive: true, plugins: { title: { display: true, text: '行为数据：平均反应时', color: '#f8fafc' } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: '行为数据：平均反应时', color: '#f8fafc' } } }
     });
 
     new Chart(document.getElementById('chartEye').getContext('2d'), {
@@ -394,7 +465,7 @@ async function showResults() {
                 backgroundColor: ['#64748b', '#f59e0b'], borderRadius: 6
             }]
         },
-        options: { responsive: true, plugins: { title: { display: true, text: '眼动数据：首次注视潜伏期', color: '#f8fafc' } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: '眼动数据：首次注视潜伏期', color: '#f8fafc' } } }
     });
 
     new Chart(document.getElementById('chartDist').getContext('2d'), {
@@ -406,6 +477,6 @@ async function showResults() {
                 { label: '改进 RT', data: e1Imp.map(t=>t.rt), borderColor: '#ef4444', tension: 0.3 }
             ]
         },
-        options: { responsive: true, plugins: { title: { display: true, text: '反应时分布趋势 (逐试次)', color: '#f8fafc' } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: '反应时分布趋势 (逐试次)', color: '#f8fafc' } } }
     });
 }
