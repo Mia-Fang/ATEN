@@ -98,6 +98,45 @@ function startValidation() {
         else dom.btnValRetry.classList.remove('hidden'); 
         return;
     }
+    
+    document.getElementById('val-progress').innerText = currentValIndex + 1;
+    dom.valArea.innerHTML = '';
+    const dot = document.createElement('div');
+    dot.className = 'val-dot'; dot.style.left = `${valPositions[currentValIndex][0]}%`; dot.style.top = `${valPositions[currentValIndex][1]}%`;
+    dom.valArea.appendChild(dot);
+    
+    let valGazeData = [];
+    // 每 50ms 记录一次坐标
+    const interval = setInterval(() => { 
+        if (gazeData.x && gazeData.y) valGazeData.push({x: gazeData.x, y: gazeData.y, time: performance.now()}); 
+    }, 50);
+    
+    // 👇 核心修改 1：时间从 1500 延长到 2500 毫秒 (2.5秒)
+    setTimeout(() => {
+        clearInterval(interval);
+        
+        // 👇 核心修改 2：剔除前 500ms 的“视线移动期”数据
+        const startTime = valGazeData.length > 0 ? valGazeData[0].time : 0;
+        const stableData = valGazeData.filter(d => d.time - startTime > 500);
+
+        if (stableData.length > 0) {
+            const meanX = stableData.reduce((a,b)=>a+b.x, 0) / stableData.length;
+            const meanY = stableData.reduce((a,b)=>a+b.y, 0) / stableData.length;
+            const rect = dom.valArea.getBoundingClientRect();
+            const absTargetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
+            const absTargetY = rect.top + (valPositions[currentValIndex][1] / 100) * rect.height;
+            
+            const error = Math.sqrt(Math.pow(meanX - absTargetX, 2) + Math.pow(meanY - absTargetY, 2));
+            valErrors.push(error);
+        } else { 
+            valErrors.push(500); // 如果2.5秒内眼睛完全不在屏幕内，记大误差
+        }
+        
+        currentValIndex++; 
+        startValidation();
+    }, 2500); // <-- 这里改成了 2500
+}
+    }
     document.getElementById('val-progress').innerText = currentValIndex + 1;
     dom.valArea.innerHTML = '';
     const dot = document.createElement('div');
