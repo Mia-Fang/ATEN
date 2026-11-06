@@ -274,31 +274,34 @@ function finishValidation() {
         `${advice} 最大单点误差 ${max.toFixed(0)} px${invalidText}。`;
 }
 
-// 重新校准
-dom.btnValRetry.addEventListener('click', () => {
-    dom.val.classList.add('hidden');
-    dom.calib.classList.remove('hidden');
+// 重新校准（加入安全判断）
+if (dom.btnValRetry) {
+    dom.btnValRetry.addEventListener('click', () => {
+        dom.val.classList.add('hidden');
+        dom.calib.classList.remove('hidden');
 
-    dom.btnCalibDone.classList.add('hidden');
-    dom.valResult.classList.add('hidden');
-    dom.valAdvice.innerText = '';
-    dom.btnValDone.classList.add('hidden');
-    dom.btnValRetry.classList.add('hidden');
+        if (dom.btnCalibDone) dom.btnCalibDone.classList.add('hidden');
+        if (dom.valResult) dom.valResult.classList.add('hidden');
+        if (dom.valAdvice) dom.valAdvice.innerText = '';
+        if (dom.btnValDone) dom.btnValDone.classList.add('hidden');
+        if (dom.btnValRetry) dom.btnValRetry.classList.add('hidden');
 
-    currentValIndex = 0;
-    valErrors = [];
-    calibValidated = false;
-    calibValidationError = -1;
+        currentValIndex = 0;
+        valErrors = [];
+        calibValidated = false;
+        calibValidationError = -1;
 
-    setupCalibration();
-});
+        setupCalibration();
+    });
+}
 
-// 接受当前精度，继续实验
-dom.btnValDone.addEventListener('click', () => {
-    dom.val.classList.add('hidden');
-    startExp1();
-});
-
+// 接受当前精度，继续实验（加入安全判断）
+if (dom.btnValDone) {
+    dom.btnValDone.addEventListener('click', () => {
+        dom.val.classList.add('hidden');
+        startExp1();
+    });
+}
 // --- 实验一 ---
 let exp1TrialCount = 0, exp1StartTime = 0, currentExp1Cond = '';
 let targetElement = null, trialData = {}, samplingInterval = null;
