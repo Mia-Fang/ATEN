@@ -14,9 +14,9 @@ const PROJECT_CODE = 'ZS3Z7F';
 let PARTICIPANT_NAME = '', PARTICIPANT_ID = '';
 let allTrials = [];
 let gazeData = { x: null, y: null };
-let gazeTimestamp = 0;              
-let calibValidationError = -1;      
-let calibValidated = false;         
+let gazeTimestamp = 0;
+let calibValidationError = -1;
+let calibValidated = false;
 
 const dom = {
     welcome: document.getElementById('screen-welcome'),
@@ -25,23 +25,19 @@ const dom = {
     exp1: document.getElementById('screen-exp1'),
     exp2: document.getElementById('screen-exp2'),
     results: document.getElementById('screen-results'),
-
     inputName: document.getElementById('input-name'),
     consent: document.getElementById('consent'),
     btnStart: document.getElementById('btn-start'),
     btnSkipCamera: document.getElementById('btn-skip-camera'),
-
     calibArea: document.getElementById('calibration-area'),
     calibProgress: document.getElementById('calib-progress'),
     btnCalibDone: document.getElementById('btn-calib-done'),
-
     valArea: document.getElementById('validation-area'),
     valProgress: document.getElementById('val-progress'),
     valResult: document.getElementById('val-result'),
     valAdvice: document.getElementById('val-advice'),
     btnValDone: document.getElementById('btn-val-done'),
     btnValRetry: document.getElementById('btn-val-retry'),
-
     exp1Stage: document.getElementById('exp1-stage'),
     exp2Stage: document.getElementById('exp2-stage')
 };
@@ -67,13 +63,14 @@ dom.btnStart.addEventListener('click', () => {
     dom.calib.classList.remove('hidden');
     setupCalibration();
 
+    // 强行配置 CDN 路径，尽量绕开 404
+    if (window.webgazer && window.webgazer.params && window.webgazer.params.faceMesh) {
+        window.webgazer.params.faceMesh.modelUrl = "https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh@0.0.5/dist/model.json";
+    }
+
+    // 开始眼动
     try {
         dom.btnStart.innerText = "请求摄像头...";
-        // 强制覆盖路径到 CDN
-        if (window.webgazer && window.webgazer.params && window.webgazer.params.faceMesh) {
-            window.webgazer.params.faceMesh.modelUrl = "https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh@0.0.5/dist/model.json";
-        }
-
         webgazer.showVideoPreview(false).showPredictionPoints(false);
         if (typeof webgazer.applyKalmanFilter === 'function') webgazer.applyKalmanFilter(true);
         
@@ -82,14 +79,13 @@ dom.btnStart.addEventListener('click', () => {
                 gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
                 gazeTimestamp = performance.now(); 
             }
-        }).begin().catch(err => {
-            console.warn("眼动仪初始化崩溃，但实验继续：", err);
-        });
+        }).begin().catch(e => console.warn("眼动库加载异常", e));
     } catch (err) { 
-        console.warn("眼动仪初始化同步报错，但实验继续：", err); 
+        console.warn("眼动同步报错", err); 
     }
 });
 
+// 无摄像头测试按钮
 dom.btnSkipCamera.addEventListener('click', () => {
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
@@ -146,7 +142,6 @@ dom.btnCalibDone.addEventListener('click', () => {
 const valPositions = [[10, 10], [90, 10], [10, 90], [90, 90], [50, 50]];
 const VAL_POINT_DURATION = 1500;   
 const VAL_SETTLE_TIME = 300;       
-const VAL_MIN_SAMPLES = 3;         
 const VAL_DATA_FRESH_MS = 500;     
 
 let currentValIndex = 0;
@@ -241,25 +236,23 @@ function finishValidation() {
     dom.valAdvice.innerText = advice;
 }
 
-if (dom.btnValRetry) {
-    dom.btnValRetry.addEventListener('click', () => {
-        dom.val.classList.add('hidden'); dom.calib.classList.remove('hidden');
-        if (dom.btnCalibDone) dom.btnCalibDone.classList.add('hidden');
-        if (dom.valResult) dom.valResult.classList.add('hidden');
-        if (dom.valAdvice) dom.valAdvice.innerText = '';
-        if (dom.btnValDone) dom.btnValDone.classList.add('hidden');
-        if (dom.btnValRetry) dom.btnValRetry.classList.add('hidden');
-        currentValIndex = 0; valErrors = [];
-        calibValidated = false; calibValidationError = -1;
-        setupCalibration();
-    });
-}
+dom.btnValRetry.addEventListener('click', () => {
+    dom.val.classList.add('hidden'); 
+    dom.calib.classList.remove('hidden');
+    dom.btnCalibDone.classList.add('hidden');
+    dom.valResult.classList.add('hidden');
+    dom.valAdvice.innerText = '';
+    dom.btnValDone.classList.add('hidden');
+    dom.btnValRetry.classList.add('hidden');
+    currentValIndex = 0; valErrors = [];
+    calibValidated = false; calibValidationError = -1;
+    setupCalibration();
+});
 
-if (dom.btnValDone) {
-    dom.btnValDone.addEventListener('click', () => {
-        dom.val.classList.add('hidden'); startExp1();
-    });
-}
+dom.btnValDone.addEventListener('click', () => {
+    dom.val.classList.add('hidden'); 
+    startExp1();
+});
 
 // --- 实验一 ---
 let exp1TrialCount = 0, exp1StartTime = 0, currentExp1Cond = '';
