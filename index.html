@@ -7,11 +7,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+    
+    <!-- 🚨 核心修复：使用现代版 webgazer-ts，彻底解决路径死锁问题 -->
+    <script type="module">
+        import webgazer from 'https://cdn.jsdelivr.net/npm/@webgazer-ts/core@latest/dist/webgazer-ts.js';
+        window.webgazer = webgazer;
+        // 页面加载完成后触发一个自定义事件，通知 main.js 库已准备好
+        window.dispatchEvent(new Event('webgazerLoaded'));
+    </script>
 </head>
 <body>
 
-    <!-- 1. 欢迎页 -->
     <div id="screen-welcome" class="card">
         <h1 class="gradient-text">🕵️ 暗黑模式审计局</h1>
         <p class="subtitle">欢迎加入高级体验官计划。本测试将考察你在复杂 UI 环境下的注意力分配与认知控制能力。</p>
@@ -28,7 +34,6 @@
         </div>
     </div>
 
-    <!-- 2. 眼动仪校准 -->
     <div id="screen-calibration" class="fullscreen-overlay hidden">
         <div class="overlay-header">
             <h2>👁️ 眼动仪校准</h2>
@@ -40,7 +45,6 @@
         <button id="btn-calib-done" class="btn-primary hidden">校准完成，进入验证</button>
     </div>
 
-    <!-- 3. 眼动仪验证 -->
     <div id="screen-validation" class="fullscreen-overlay hidden">
         <div class="overlay-header">
             <h2>🎯 眼动仪验证</h2>
@@ -58,7 +62,6 @@
         </div>
     </div>
 
-    <!-- 4. 实验一 -->
     <div id="screen-exp1" class="fullscreen-overlay hidden">
         <div class="overlay-header">
             <h2>测试一：视觉搜索 (FIT 理论)</h2>
@@ -71,7 +74,6 @@
         </div>
     </div>
 
-    <!-- 5. 实验二 -->
     <div id="screen-exp2" class="fullscreen-overlay hidden">
         <div class="overlay-header">
             <h2>测试二：取消订阅 (复合 UI Stroop)</h2>
@@ -86,7 +88,6 @@
         </div>
     </div>
 
-    <!-- 6. 结果页 -->
     <div id="screen-results" class="card hidden" style="max-width: 1200px; width: 95%;">
         <h2 class="gradient-text">📊 认知审计与眼动追踪报告</h2>
         
