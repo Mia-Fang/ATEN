@@ -1,15 +1,3 @@
-// 修复 Canvas 警告
-(function() {
-    const originalGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function(contextType, contextAttributes) {
-        if (contextType === '2d') {
-            contextAttributes = contextAttributes || {};
-            contextAttributes.willReadFrequently = true;
-        }
-        return originalGetContext.call(this, contextType, contextAttributes);
-    };
-})();
-
 const PROJECT_CODE = 'ZS3Z7F';
 let PARTICIPANT_NAME = '', PARTICIPANT_ID = '';
 let allTrials = [];
@@ -17,6 +5,7 @@ let gazeData = { x: null, y: null };
 let gazeTimestamp = 0;
 let calibValidationError = -1;
 let calibValidated = false;
+let webgazerReady = false;
 
 const dom = {
     welcome: document.getElementById('screen-welcome'),
@@ -42,7 +31,13 @@ const dom = {
     exp2Stage: document.getElementById('exp2-stage')
 };
 
-// --- 初始化 ---
+// 监听 webgazer-ts 是否加载完毕
+window.addEventListener('webgazerLoaded', () => {
+    webgazerReady = true;
+    dom.btnStart.innerText = "启动眼动仪并开始";
+});
+
+// --- 表单校验 ---
 dom.consent.addEventListener('change', (e) => {
     const isReady = e.target.checked && dom.inputName.value.trim() !== '';
     dom.btnStart.disabled = !isReady;
@@ -55,37 +50,41 @@ dom.inputName.addEventListener('input', () => {
     dom.btnSkipCamera.disabled = !isReady;
 });
 
-dom.btnStart.addEventListener('click', () => {
+// --- 启动实验 ---
+dom.btnStart.addEventListener('click', async () => {
+    if (!webgazerReady) {
+        alert("眼动库还在加载中，请稍等2秒再试...");
+        return;
+    }
+
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
     
-    dom.welcome.classList.add('hidden'); 
-    dom.calib.classList.remove('hidden');
-    setupCalibration();
-
-    // 强行配置 CDN 路径，尽量绕开 404
-    if (window.webgazer && window.webgazer.params && window.webgazer.params.faceMesh) {
-        window.webgazer.params.faceMesh.modelUrl = "https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh@0.0.5/dist/model.json";
-    }
-
-    // 开始眼动
+    dom.btnStart.innerText = "请求摄像头权限...";
+    
     try {
-        dom.btnStart.innerText = "请求摄像头...";
-        webgazer.showVideoPreview(false).showPredictionPoints(false);
-        if (typeof webgazer.applyKalmanFilter === 'function') webgazer.applyKalmanFilter(true);
-        
-        webgazer.setGazeListener((data) => { 
+        // 启动摄像头和追踪
+        await webgazer.setGazeListener((data) => { 
             if (data) {
                 gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
                 gazeTimestamp = performance.now(); 
             }
-        }).begin().catch(e => console.warn("眼动库加载异常", e));
-    } catch (err) { 
-        console.warn("眼动同步报错", err); 
+        }).begin();
+        
+        // 强制隐藏视频画面和红点
+        webgazer.showVideoPreview(false).showPredictionPoints(false);
+
+        // 成功启动后切换页面
+        dom.welcome.classList.add('hidden'); 
+        dom.calib.classList.remove('hidden');
+        setupCalibration();
+    } catch (err) {
+        alert("摄像头启动失败！请确保使用 HTTPS 访问，并允许浏览器使用摄像头。\n\n错误信息：" + err.message);
+        dom.btnStart.innerText = "启动眼动仪并开始";
     }
 });
 
-// 无摄像头测试按钮
+// 无摄像头降级方案
 dom.btnSkipCamera.addEventListener('click', () => {
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
@@ -124,17 +123,10 @@ dom.btnCalibDone.addEventListener('click', () => {
     dom.btnCalibDone.classList.add('hidden');
     dom.calib.classList.add('hidden');
     dom.val.classList.remove('hidden');
-
-    currentValIndex = 0;
-    valErrors = [];
-    calibValidated = false;
-    calibValidationError = -1;
-
-    dom.valResult.classList.add('hidden');
-    dom.valAdvice.innerText = '';
-    dom.btnValDone.classList.add('hidden');
-    dom.btnValRetry.classList.add('hidden');
-
+    currentValIndex = 0; valErrors = [];
+    calibValidated = false; calibValidationError = -1;
+    dom.valResult.classList.add('hidden'); dom.valAdvice.innerText = '';
+    dom.btnValDone.classList.add('hidden'); dom.btnValRetry.classList.add('hidden');
     requestAnimationFrame(() => startValidation());
 });
 
@@ -143,16 +135,11 @@ const valPositions = [[10, 10], [90, 10], [10, 90], [90, 90], [50, 50]];
 const VAL_POINT_DURATION = 1500;   
 const VAL_SETTLE_TIME = 300;       
 const VAL_DATA_FRESH_MS = 500;     
-
 let currentValIndex = 0;
 let valErrors = [];
 
 function startValidation() {
-    if (currentValIndex >= valPositions.length) {
-        finishValidation();
-        return;
-    }
-
+    if (currentValIndex >= valPositions.length) { finishValidation(); return; }
     document.getElementById('val-progress').innerText = currentValIndex + 1;
     dom.valArea.innerHTML = '';
 
@@ -184,7 +171,6 @@ function startValidation() {
     setTimeout(() => {
         clearInterval(interval);
         clearTimeout(globalTimeout);
-        
         if (samples.length > 0) {
             const rect = dom.valArea.getBoundingClientRect();
             const targetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
@@ -196,7 +182,6 @@ function startValidation() {
         } else {
             valErrors.push(null);
         }
-
         currentValIndex++;
         startValidation();
     }, VAL_POINT_DURATION);
@@ -204,14 +189,12 @@ function startValidation() {
 
 function finishValidation() {
     const validErrors = valErrors.filter(e => e !== null && Number.isFinite(e));
-    
     dom.valResult.classList.remove('hidden');
     dom.btnValDone.classList.remove('hidden');
     dom.btnValRetry.classList.remove('hidden');
 
     if (validErrors.length === 0) {
-        calibValidationError = -1;
-        calibValidated = false;
+        calibValidationError = -1; calibValidated = false;
         dom.valResult.innerText = '⚠️ 未采集到有效眼动数据';
         dom.valResult.style.color = 'var(--warning)';
         dom.valAdvice.innerText = '眼动模型加载失败或摄像头未开启。可直接点击下方按钮继续实验（纯行为模式）。';
@@ -219,17 +202,12 @@ function finishValidation() {
     }
 
     const avg = validErrors.reduce((a, b) => a + b, 0) / validErrors.length;
-    calibValidationError = avg;
-    calibValidated = true;
+    calibValidationError = avg; calibValidated = true;
 
     let level, color, advice;
-    if (avg < 120) {
-        level = '优秀'; color = 'var(--success)'; advice = '眼动追踪精度良好。';
-    } else if (avg < 250) {
-        level = '可接受'; color = 'var(--warning)'; advice = '存在一定误差，数据仍可用。';
-    } else {
-        level = '较差'; color = 'var(--danger)'; advice = '误差较大，建议重新校准。';
-    }
+    if (avg < 120) { level = '优秀'; color = 'var(--success)'; advice = '眼动追踪精度良好。'; }
+    else if (avg < 250) { level = '可接受'; color = 'var(--warning)'; advice = '存在一定误差，数据仍可用。'; }
+    else { level = '较差'; color = 'var(--danger)'; advice = '误差较大，建议重新校准。'; }
 
     dom.valResult.innerText = `验证完成：平均误差 ${avg.toFixed(0)} px（${level}）`;
     dom.valResult.style.color = color;
@@ -237,24 +215,18 @@ function finishValidation() {
 }
 
 dom.btnValRetry.addEventListener('click', () => {
-    dom.val.classList.add('hidden'); 
-    dom.calib.classList.remove('hidden');
-    dom.btnCalibDone.classList.add('hidden');
-    dom.valResult.classList.add('hidden');
-    dom.valAdvice.innerText = '';
-    dom.btnValDone.classList.add('hidden');
-    dom.btnValRetry.classList.add('hidden');
-    currentValIndex = 0; valErrors = [];
-    calibValidated = false; calibValidationError = -1;
+    dom.val.classList.add('hidden'); dom.calib.classList.remove('hidden');
+    dom.btnCalibDone.classList.add('hidden'); dom.valResult.classList.add('hidden');
+    dom.valAdvice.innerText = ''; dom.btnValDone.classList.add('hidden'); dom.btnValRetry.classList.add('hidden');
+    currentValIndex = 0; valErrors = []; calibValidated = false; calibValidationError = -1;
     setupCalibration();
 });
 
 dom.btnValDone.addEventListener('click', () => {
-    dom.val.classList.add('hidden'); 
-    startExp1();
+    dom.val.classList.add('hidden'); startExp1();
 });
 
-// --- 实验一 ---
+// --- 实验一 (视觉搜索) ---
 let exp1TrialCount = 0, exp1StartTime = 0, currentExp1Cond = '';
 let targetElement = null, trialData = {}, samplingInterval = null;
 
@@ -343,7 +315,7 @@ function renderStimuliExp1() {
     dom.exp1Stage.appendChild(targetElement);
 }
 
-// --- 实验二 ---
+// --- 实验二 (UI Stroop) ---
 let exp2TrialCount = 0, exp2StartTime = 0, currentExp2Cond = '';
 let exp2Positions = [];
 
