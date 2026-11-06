@@ -6,8 +6,11 @@
     <title>暗黑模式审计局 - 注意力实验室</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+    <!-- 替换为新版 -->
+    <script type="module">
+        import webgazer from 'https://cdn.jsdelivr.net/npm/@webgazer-ts/core@latest/dist/webgazer-ts.js';
+        window.webgazer = webgazer; // 挂载到全局，方便 main.js 调用
+    </script>
 </head>
 <body>
 
