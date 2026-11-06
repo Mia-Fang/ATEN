@@ -34,6 +34,7 @@ dom.btnStart.addEventListener('click', async () => {
     try {
         dom.btnStart.innerText = "请求摄像头...";
         webgazer.showVideoPreview(false).showPredictionPoints(false);
+        webgazer.setTracker('TFFacemesh');
         webgazer.setGazeListener((data) => { if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; }).begin();
         dom.welcome.classList.add('hidden'); dom.calib.classList.remove('hidden');
         setupCalibration();
