@@ -32,27 +32,23 @@ dom.btnStart.addEventListener('click', async () => {
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
     try {
-    dom.btnStart.innerText = "请求摄像头...";
-    webgazer.showVideoPreview(false).showPredictionPoints(false);
-    
-    // 核心修复：显式指定追踪器类型
-    webgazer.setTracker("TFFacemesh"); 
-    
-    webgazer.setGazeListener((data) => { 
-        if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
-    }).begin();
-    
-    dom.welcome.classList.add('hidden'); dom.calib.classList.remove('hidden');
-    setupCalibration();
-} catch (err) { 
-    // ... 
-}
+        dom.btnStart.innerText = "请求摄像头...";
+        webgazer.showVideoPreview(false).showPredictionPoints(false);
+        webgazer.setGazeListener((data) => { if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; }).begin();
+        dom.welcome.classList.add('hidden'); dom.calib.classList.remove('hidden');
+        setupCalibration();
+    } catch (err) { 
+        alert("摄像头启动失败，请使用 HTTPS 访问或直接点击下方的【无摄像头测试】。"); 
+        dom.btnStart.innerText = "启动眼动仪并开始";
+    }
+});
 
 dom.btnSkipCamera.addEventListener('click', () => {
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
     dom.welcome.classList.add('hidden'); startExp1(); 
 });
+
 
 // --- 校准与验证 (简略，同上) ---
 let calibCount = 0;
