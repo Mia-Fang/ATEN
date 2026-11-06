@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>暗黑模式审计局 - 注意力实验室</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+</head>
+<body>
+
+    <!-- 1. 欢迎页 -->
+    <div id="screen-welcome" class="card">
+        <h1 class="gradient-text">🕵️ 暗黑模式审计局</h1>
+        <p class="subtitle">欢迎加入高级体验官计划。本测试将考察你在复杂 UI 环境下的注意力分配与认知控制能力。</p>
+        <div class="form-group">
+            <input type="text" id="input-name" placeholder="请输入您的姓名或代号" required>
+        </div>
+        <label class="checkbox-label">
+            <input type="checkbox" id="consent"> 
+            <span>我已阅读并同意参与实验（需摄像头权限，数据匿名）</span>
+        </label>
+        <div class="btn-group">
+            <button id="btn-start" class="btn-primary" disabled>启动眼动仪并开始</button>
+            <button id="btn-skip-camera" class="btn-secondary" disabled>无摄像头测试</button>
+        </div>
+    </div>
+
+    <!-- 2. 眼动仪校准 -->
+    <div id="screen-calibration" class="fullscreen-overlay hidden">
+        <div class="overlay-header">
+            <h2>👁️ 眼动仪校准</h2>
+            <p>请依次点击屏幕上的 <b>9 个红点</b>，每个点点击 3 次，视线务必盯紧。</p>
+            <div class="progress-bar"><div id="calib-progress-bar" class="progress-fill"></div></div>
+            <p class="progress-text">进度: <span id="calib-progress">0</span> / 27</p>
+        </div>
+        <div id="calibration-area"></div>
+        <button id="btn-calib-done" class="btn-primary hidden">校准完成，进入验证</button>
+    </div>
+
+    <!-- 3. 眼动仪验证 -->
+    <div id="screen-validation" class="fullscreen-overlay hidden">
+        <div class="overlay-header">
+            <h2>🎯 眼动仪验证</h2>
+            <p>请将视线集中在出现的 <b>闪烁蓝点</b> 上（不需要点击），保持 1.5 秒。</p>
+            <p class="progress-text">进度: <span id="val-progress">1</span> / 5</p>
+        </div>
+        <div id="validation-area"></div>
+        <h2 id="val-result" class="hidden"></h2>
+        <div class="btn-group">
+            <button id="btn-val-retry" class="btn-danger hidden">重新校准</button>
+            <button id="btn-val-done" class="btn-primary hidden">验证通过，进入实验</button>
+            <button id="btn-val-skip" class="btn-secondary hidden">跳过验证</button>
+        </div>
+    </div>
+
+    <!-- 4. 实验一 -->
+    <div id="screen-exp1" class="fullscreen-overlay hidden">
+        <div class="overlay-header">
+            <h2>测试一：视觉搜索 (FIT 理论)</h2>
+            <p>请在杂乱的广告中，快速找到并点击 <b style="color:#ef4444; font-size: 1.2em;">红色</b> 的 <b>“残忍拒绝”</b> 按钮！</p>
+            <div class="progress-bar"><div id="exp1-progress-bar" class="progress-fill"></div></div>
+            <p class="progress-text">进度: <span id="exp1-trial">1</span> / 20</p>
+        </div>
+        <div id="exp1-stage">
+            <div id="fixation-cross" class="hidden">+</div>
+        </div>
+    </div>
+
+    <!-- 5. 实验二 -->
+    <div id="screen-exp2" class="fullscreen-overlay hidden">
+        <div class="overlay-header">
+            <h2>测试二：取消订阅 (复合 UI Stroop)</h2>
+            <p>请<b>无视颜色和图标诱导</b>，严格根据<b>文字含义</b>，点击“确认取消”按钮！</p>
+            <div class="progress-bar"><div id="exp2-progress-bar" class="progress-fill"></div></div>
+            <p class="progress-text">进度: <span id="exp2-trial">1</span> / 20</p>
+        </div>
+        <div class="app-modal">
+            <h3>Wait! 别走！</h3>
+            <p>您的免费试用即将结束，是否取消订阅？</p>
+            <div id="exp2-stage"></div>
+        </div>
+    </div>
+
+    <!-- 6. 结果页 -->
+    <div id="screen-results" class="card hidden" style="max-width: 1200px; width: 95%;">
+        <h2 class="gradient-text">📊 认知审计与眼动追踪报告</h2>
+        
+        <div id="results-dashboard">
+            <!-- 数据质量 -->
+            <div class="data-card highlight-card">
+                <h3>🛠️ 数据质量与眼动设备状态</h3>
+                <div class="stats-grid">
+                    <div class="stat-item"><span>有效试次 / 总试次</span><b id="res-quality-trials">-</b></div>
+                    <div class="stat-item"><span>校准状态 / 验证误差</span><b id="res-quality-calib">-</b></div>
+                    <div class="stat-item"><span>眼动有效采样率</span><b id="res-quality-eye-rate">-</b></div>
+                    <div class="stat-item"><span>极端值/过快反应剔除</span><b id="res-quality-outliers">-</b></div>
+                </div>
+            </div>
+
+            <!-- 实验一行为 -->
+            <div class="data-card">
+                <h3>👀 实验一：视觉搜索行为与效应</h3>
+                <div class="stats-grid">
+                    <div class="stat-item"><span>基线 RT (均值 / 中位数)</span><b id="res-e1-base">-</b></div>
+                    <div class="stat-item"><span>改进 RT (均值 / 中位数)</span><b id="res-e1-imp">-</b></div>
+                    <div class="stat-item"><span>目标显著性效应 (d)</span><b id="res-e1-d" class="highlight">-</b></div>
+                    <div class="stat-item"><span>遗漏率 / 错误率</span><b id="res-e1-miss">-</b></div>
+                </div>
+            </div>
+
+            <!-- 实验一眼动 -->
+            <div class="data-card">
+                <h3>👁️ 实验一：眼动搜索效率与注意分配</h3>
+                <div class="stats-grid">
+                    <div class="stat-item"><span>目标区域首次注视潜伏期 (TTFF)</span><b id="res-e1-ttff" class="highlight-yellow">-</b></div>
+                    <div class="stat-item"><span>目标区域采样比例 (改进)</span><b id="res-e1-aoi-tar">-</b></div>
+                    <div class="stat-item"><span>竞争区域采样比例 (改进)</span><b id="res-e1-aoi-dist">-</b></div>
+                    <div class="stat-item"><span>眼动搜索效率提升</span><b id="res-e1-eye-eff">-</b></div>
+                </div>
+            </div>
+
+            <!-- 实验二行为 -->
+            <div class="data-card">
+                <h3>🧠 实验二：Stroop 行为与冲突效应</h3>
+                <div class="stats-grid">
+                    <div class="stat-item"><span>兼容 RT (均值 / 中位数)</span><b id="res-e2-comp">-</b></div>
+                    <div class="stat-item"><span>冲突 RT (均值 / 中位数)</span><b id="res-e2-conf">-</b></div>
+                    <div class="stat-item"><span>Stroop 冲突效应量</span><b id="res-e2-effect" class="highlight">-</b></div>
+                    <div class="stat-item"><span>正确率 (兼容 / 冲突)</span><b id="res-e2-acc">-</b></div>
+                </div>
+            </div>
+
+            <!-- 群体对比模块 -->
+            <div class="data-card group-card">
+                <h3>🏆 与全班/群体数据对比 (我的 RT 表现)</h3>
+                <p style="font-size: 13px; color: #94a3b8; margin-bottom: 15px;">散点代表其他被试的平均反应时，⭐ 代表你。越靠左代表速度越快。</p>
+                <div class="chart-container" style="height: 250px;"><canvas id="chartGroup"></canvas></div>
+            </div>
+
+            <!-- 图表区 -->
+            <div class="chart-row">
+                <div class="chart-container half"><canvas id="chartRT"></canvas></div>
+                <div class="chart-container half"><canvas id="chartEye"></canvas></div>
+            </div>
+            <div class="chart-container"><canvas id="chartDist"></canvas></div>
+        </div>
+        
+        <button id="btn-upload" class="btn-primary" style="margin-top: 20px; width: 100%; font-size: 18px; padding: 15px;">上传原始数据与分析结果并结束</button>
+        <p id="upload-status" class="status-text"></p>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
