@@ -34,11 +34,16 @@ dom.btnStart.addEventListener('click', async () => {
     try {
         dom.btnStart.innerText = "请求摄像头...";
         webgazer.showVideoPreview(false).showPredictionPoints(false);
-        // 开启卡尔曼滤波，平滑眼动数据，减少抖动
-        webgazer.applyKalmanFilter(true); 
-        webgazer.setGazeListener((data) => { if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; }).begin();
         
-
+        // 开启卡尔曼滤波平滑数据
+        if (typeof webgazer.applyKalmanFilter === 'function') {
+            webgazer.applyKalmanFilter(true);
+        }
+        
+        webgazer.setGazeListener((data) => { 
+            if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
+        }).begin();
+        
         dom.welcome.classList.add('hidden'); dom.calib.classList.remove('hidden');
         setupCalibration();
     } catch (err) { 
@@ -53,8 +58,7 @@ dom.btnSkipCamera.addEventListener('click', () => {
     dom.welcome.classList.add('hidden'); startExp1(); 
 });
 
-
-// --- 校准与验证 (简略，同上) ---
+// --- 校准与验证 ---
 let calibCount = 0;
 function setupCalibration() {
     const positions = [[5,5],[50,5],[95,5],[5,50],[50,50],[95,50],[5,95],[50,95],[95,95]];
@@ -62,6 +66,7 @@ function setupCalibration() {
     document.getElementById('calib-progress').innerText = 0;
     document.getElementById('calib-progress-bar').style.width = '0%';
     dom.btnCalibDone.classList.add('hidden');
+    
     positions.forEach(([x, y]) => {
         const dot = document.createElement('div');
         dot.className = 'calib-dot'; dot.style.left = `${x}%`; dot.style.top = `${y}%`;
@@ -95,13 +100,12 @@ function startValidation() {
         calibValidationError = avgError; 
         dom.valResult.classList.remove('hidden');
         
-        // 👇 核心修改：不再强制要求 < 150，只要跑完就无条件放行
+        // 👇 强制放行逻辑：无论误差多大，都让用户进入实验
         dom.valResult.innerText = `验证结束！平均误差: ${avgError.toFixed(1)} px (已忽略误差，可继续实验)`;
-        dom.valResult.style.color = 'var(--warning)'; // 用黄色警告色
+        dom.valResult.style.color = 'var(--warning)'; 
         
-        // 无论误差多大，直接显示“进入实验”按钮
-        dom.btnValDone.classList.remove('hidden');
-        dom.btnValSkip.classList.add('hidden'); // 把跳过按钮隐藏，因为已经强制放行了
+        dom.btnValDone.classList.remove('hidden'); // 显示“验证通过，进入实验”
+        dom.btnValSkip.classList.add('hidden'); // 隐藏跳过按钮
         dom.btnValRetry.classList.add('hidden'); // 隐藏重新校准
         return;
     }
@@ -120,7 +124,7 @@ function startValidation() {
     setTimeout(() => {
         clearInterval(interval);
         
-        // 剔除前 500ms 移动期
+        // 剔除前 500ms 的移动期，采集稳定数据
         const startTime = valGazeData.length > 0 ? valGazeData[0].time : 0;
         const stableData = valGazeData.filter(d => d.time - startTime > 500);
 
@@ -139,66 +143,7 @@ function startValidation() {
         
         currentValIndex++; 
         startValidation();
-    }, 2000); // 时间调整为2秒，减少等待焦虑
-}
-    
-    document.getElementById('val-progress').innerText = currentValIndex + 1;
-    dom.valArea.innerHTML = '';
-    const dot = document.createElement('div');
-    dot.className = 'val-dot'; dot.style.left = `${valPositions[currentValIndex][0]}%`; dot.style.top = `${valPositions[currentValIndex][1]}%`;
-    dom.valArea.appendChild(dot);
-    
-    let valGazeData = [];
-    // 每 50ms 记录一次坐标
-    const interval = setInterval(() => { 
-        if (gazeData.x && gazeData.y) valGazeData.push({x: gazeData.x, y: gazeData.y, time: performance.now()}); 
-    }, 50);
-    
-    // 👇 核心修改 1：时间从 1500 延长到 2500 毫秒 (2.5秒)
-    setTimeout(() => {
-        clearInterval(interval);
-        
-        // 👇 核心修改 2：剔除前 500ms 的“视线移动期”数据
-        const startTime = valGazeData.length > 0 ? valGazeData[0].time : 0;
-        const stableData = valGazeData.filter(d => d.time - startTime > 500);
-
-        if (stableData.length > 0) {
-            const meanX = stableData.reduce((a,b)=>a+b.x, 0) / stableData.length;
-            const meanY = stableData.reduce((a,b)=>a+b.y, 0) / stableData.length;
-            const rect = dom.valArea.getBoundingClientRect();
-            const absTargetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
-            const absTargetY = rect.top + (valPositions[currentValIndex][1] / 100) * rect.height;
-            
-            const error = Math.sqrt(Math.pow(meanX - absTargetX, 2) + Math.pow(meanY - absTargetY, 2));
-            valErrors.push(error);
-        } else { 
-            valErrors.push(500); // 如果2.5秒内眼睛完全不在屏幕内，记大误差
-        }
-        
-        currentValIndex++; 
-        startValidation();
-    }, 2500); // <-- 这里改成了 2500
-}
-    }
-    document.getElementById('val-progress').innerText = currentValIndex + 1;
-    dom.valArea.innerHTML = '';
-    const dot = document.createElement('div');
-    dot.className = 'val-dot'; dot.style.left = `${valPositions[currentValIndex][0]}%`; dot.style.top = `${valPositions[currentValIndex][1]}%`;
-    dom.valArea.appendChild(dot);
-    let valGazeData = [];
-    const interval = setInterval(() => { if (gazeData.x && gazeData.y) valGazeData.push({x: gazeData.x, y: gazeData.y}); }, 50);
-    setTimeout(() => {
-        clearInterval(interval);
-        if (valGazeData.length > 0) {
-            const meanX = valGazeData.reduce((a,b)=>a+b.x, 0) / valGazeData.length;
-            const meanY = valGazeData.reduce((a,b)=>a+b.y, 0) / valGazeData.length;
-            const rect = dom.valArea.getBoundingClientRect();
-            const absTargetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
-            const absTargetY = rect.top + (valPositions[currentValIndex][1] / 100) * rect.height;
-            valErrors.push(Math.sqrt(Math.pow(meanX - absTargetX, 2) + Math.pow(meanY - absTargetY, 2)));
-        } else { valErrors.push(500); }
-        currentValIndex++; startValidation();
-    }, 1500);
+    }, 2000); 
 }
 
 dom.btnValRetry.addEventListener('click', () => { dom.val.classList.add('hidden'); dom.calib.classList.remove('hidden'); setupCalibration(); });
@@ -304,14 +249,12 @@ function renderStimuliExp1() {
     dom.exp1Stage.appendChild(targetElement);
 }
 
-// --- 实验二 (完美伪随机洗牌算法) ---
+// --- 实验二 ---
 let exp2TrialCount = 0, exp2StartTime = 0, currentExp2Cond = '';
-let exp2Positions = []; // 存储左右位置
+let exp2Positions = []; 
 
 function startExp2() { 
-    // 初始化：生成10个左(true)、10个右(false)
     exp2Positions = Array(10).fill(true).concat(Array(10).fill(false));
-    // Fisher-Yates 洗牌算法，绝对随机打乱
     for (let i = exp2Positions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [exp2Positions[i], exp2Positions[j]] = [exp2Positions[j], exp2Positions[i]];
@@ -326,7 +269,6 @@ function runExp2Trial() {
     document.getElementById('exp2-progress-bar').style.width = `${(exp2TrialCount/20)*100}%`;
     
     currentExp2Cond = (exp2TrialCount % 2 === 0) ? 'compatible' : 'conflict';
-    // 从洗牌好的数组中拿取当前位置
     const isCancelLeft = exp2Positions[exp2TrialCount];
     
     dom.exp2Stage.innerHTML = ''; 
@@ -454,31 +396,23 @@ async function showResults() {
     document.getElementById('res-e2-acc').innerText = `${accComp.toFixed(1)}% / ${accConf.toFixed(1)}%`;
 
     // ================== 群体数据对比模块 ==================
-    let groupData = [mBase, mImp]; // 默认兜底：如果没有拉到全班数据，就显示自己
+    let groupData = [mBase, mImp]; 
     let isMock = true;
     try {
-        // 尝试去老师的服务器拉取全班汇总数据（假设有对应接口）
-        // 如果跨域失败或无此接口，这里会抛出异常，然后进入 catch 使用模拟数据
         const res = await fetch(`https://attention-lab-production.up.railway.app/api/hw2/data?project=${PROJECT_CODE}`);
         if (res.ok) {
             const data = await res.json();
-            // 假设老师的数据结构里有班级均值
             if (data && data.group_baseline_rt) {
                 groupData = data.group_baseline_rt; 
                 isMock = false;
             }
         }
     } catch (e) {
-        // 静默失败，生成逼真的模拟群体数据
-        // 假设全班平均响应在 1800ms 左右，标准差 400ms
         for (let i = 0; i < 30; i++) {
             groupData.push(Math.max(500, 1800 + (Math.random() - 0.5) * 800));
         }
     }
 
-    const avgGroup = calcMean(groupData);
-
-    // 渲染群体对比散点图
     new Chart(document.getElementById('chartGroup').getContext('2d'), {
         type: 'scatter',
         data: {
@@ -487,17 +421,13 @@ async function showResults() {
                     label: '其他同学 (群体)',
                     data: groupData.map((val, index) => ({ x: val, y: index })),
                     backgroundColor: 'rgba(148, 163, 184, 0.5)',
-                    pointRadius: 6,
-                    pointHoverRadius: 8
+                    pointRadius: 6, pointHoverRadius: 8
                 },
                 {
                     label: '我 (My Data)',
                     data: [{ x: mBase, y: 31 }],
-                    backgroundColor: '#f59e0b', // 高亮黄色
-                    borderColor: '#fff',
-                    borderWidth: 2,
-                    pointRadius: 12,
-                    pointStyle: 'star', // 星星标记
+                    backgroundColor: '#f59e0b', borderColor: '#fff', borderWidth: 2,
+                    pointRadius: 12, pointStyle: 'star',
                 }
             ]
         },
@@ -521,7 +451,6 @@ async function showResults() {
         }
     });
 
-    // 渲染常规图表
     Chart.defaults.color = '#94a3b8';
     
     new Chart(document.getElementById('chartRT').getContext('2d'), {
