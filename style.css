@@ -70,9 +70,30 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .stat-item b { font-size: 1.1rem; color: #fff; }
 .highlight { color: var(--success) !important; }
 .highlight-yellow { color: var(--warning) !important; }
-.chart-row { display: flex; gap: 15px; margin-bottom: 15px; }
-.chart-container { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 16px; border: 1px solid var(--border); }
-.chart-container.half { flex: 1; width: 50%; }
+
+.chart-row { 
+    display: flex; 
+    gap: 15px; 
+    margin-bottom: 15px; 
+    height: 300px; /* 给整行一个固定高度 */
+}
+.chart-container { 
+    background: rgba(0,0,0,0.2); 
+    padding: 15px; 
+    border-radius: 16px; 
+    border: 1px solid var(--border); 
+    height: 300px; /* 默认图表容器高度 */
+    position: relative;
+}
+.chart-container.half { 
+    flex: 1; 
+    width: 50%; 
+    height: 100%; /* 撑满行高 */
+}
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
 /* 强制隐藏 WebGazer 的摄像头画面和默认红点 */
 #webgazerVideoContainer, #webgazerVideoFeed, #webgazerFaceOverlay, #webgazerFaceFeedbackBox, #webgazerGazeDot {
     display: none !important;
