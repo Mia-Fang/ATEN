@@ -6,11 +6,8 @@
     <title>暗黑模式审计局 - 注意力实验室</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <!-- 替换为新版 -->
-    <script type="module">
-        import webgazer from 'https://cdn.jsdelivr.net/npm/@webgazer-ts/core@latest/dist/webgazer-ts.js';
-        window.webgazer = webgazer; // 挂载到全局，方便 main.js 调用
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
 </head>
 <body>
 
@@ -43,19 +40,17 @@
         <button id="btn-calib-done" class="btn-primary hidden">校准完成，进入验证</button>
     </div>
 
-    <!-- 3. 眼动仪验证 -->
+    <!-- 3. 眼动仪验证 (恢复) -->
     <div id="screen-validation" class="fullscreen-overlay hidden">
         <div class="overlay-header">
             <h2>🎯 眼动仪验证</h2>
-            <p>请将视线集中在出现的 <b>闪烁蓝点</b> 上（不需要点击），保持 1.5 秒。</p>
+            <p>请将视线集中在出现的 <b>闪烁蓝点</b> 上（不需要点击），保持 2 秒。</p>
             <p class="progress-text">进度: <span id="val-progress">1</span> / 5</p>
         </div>
         <div id="validation-area"></div>
-        <h2 id="val-result" class="hidden"></h2>
+        <h2 id="val-result" class="hidden" style="margin-top: 15px;"></h2>
         <div class="btn-group">
-            <button id="btn-val-retry" class="btn-danger hidden">重新校准</button>
-            <button id="btn-val-done" class="btn-primary hidden">验证通过，进入实验</button>
-            <button id="btn-val-skip" class="btn-secondary hidden">跳过验证</button>
+            <button id="btn-val-done" class="btn-primary hidden">进入实验</button>
         </div>
     </div>
 
@@ -92,7 +87,6 @@
         <h2 class="gradient-text">📊 认知审计与眼动追踪报告</h2>
         
         <div id="results-dashboard">
-            <!-- 数据质量 -->
             <div class="data-card highlight-card">
                 <h3>🛠️ 数据质量与眼动设备状态</h3>
                 <div class="stats-grid">
@@ -103,7 +97,6 @@
                 </div>
             </div>
 
-            <!-- 实验一行为 -->
             <div class="data-card">
                 <h3>👀 实验一：视觉搜索行为与效应</h3>
                 <div class="stats-grid">
@@ -114,7 +107,6 @@
                 </div>
             </div>
 
-            <!-- 实验一眼动 -->
             <div class="data-card">
                 <h3>👁️ 实验一：眼动搜索效率与注意分配</h3>
                 <div class="stats-grid">
@@ -125,7 +117,6 @@
                 </div>
             </div>
 
-            <!-- 实验二行为 -->
             <div class="data-card">
                 <h3>🧠 实验二：Stroop 行为与冲突效应</h3>
                 <div class="stats-grid">
@@ -136,19 +127,17 @@
                 </div>
             </div>
 
-            <!-- 群体对比模块 -->
             <div class="data-card group-card">
                 <h3>🏆 与全班/群体数据对比 (我的 RT 表现)</h3>
                 <p style="font-size: 13px; color: #94a3b8; margin-bottom: 15px;">散点代表其他被试的平均反应时，⭐ 代表你。越靠左代表速度越快。</p>
                 <div class="chart-container" style="height: 250px;"><canvas id="chartGroup"></canvas></div>
             </div>
 
-            <!-- 图表区 -->
             <div class="chart-row">
                 <div class="chart-container half"><canvas id="chartRT"></canvas></div>
                 <div class="chart-container half"><canvas id="chartEye"></canvas></div>
             </div>
-            <div class="chart-container"><canvas id="chartDist"></canvas></div>
+            <div class="chart-container" style="height: 250px;"><canvas id="chartDist"></canvas></div>
         </div>
         
         <button id="btn-upload" class="btn-primary" style="margin-top: 20px; width: 100%; font-size: 18px; padding: 15px;">上传原始数据与分析结果并结束</button>
