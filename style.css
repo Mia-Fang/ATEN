@@ -73,3 +73,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .chart-row { display: flex; gap: 15px; margin-bottom: 15px; }
 .chart-container { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 16px; border: 1px solid var(--border); }
 .chart-container.half { flex: 1; width: 50%; }
+/* 强制隐藏 WebGazer 的摄像头画面和默认红点 */
+#webgazerVideoContainer, #webgazerVideoFeed, #webgazerFaceOverlay, #webgazerFaceFeedbackBox, #webgazerGazeDot {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    z-index: -9999 !important;
+}
