@@ -63,12 +63,18 @@ dom.btnStart.addEventListener('click', async () => {
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
     
-    // 🚨 关键修复：强制覆盖 WebGazer 的模型路径，解决 404 报错！
-    if (window.webgazer && window.webgazer.params) {
-        window.webgazer.params.faceMesh = {
-            modelUrl: "https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh@0.0.5/dist/model.json"
-        };
-    }
+dom.btnStart.addEventListener('click', async () => {
+    PARTICIPANT_NAME = dom.inputName.value.trim();
+    PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
+    
+    // 先强制切换页面，不管眼动库能不能加载，绝对不卡死！
+    dom.welcome.classList.add('hidden'); 
+    dom.calib.classList.remove('hidden');
+    setupCalibration();
+
+    try {
+        dom.btnStart.innerText = "请求摄像头...";
+        // ... 下面的代码保持不变
 
     // 先强制切换页面，不管眼动库能不能加载，绝对不卡死！
     dom.welcome.classList.add('hidden'); 
