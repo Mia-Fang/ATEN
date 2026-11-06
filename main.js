@@ -59,27 +59,20 @@ dom.inputName.addEventListener('input', () => {
     dom.btnSkipCamera.disabled = !isReady;
 });
 
-dom.btnStart.addEventListener('click', async () => {
+dom.btnStart.addEventListener('click', () => {
     PARTICIPANT_NAME = dom.inputName.value.trim();
     PARTICIPANT_ID = 'P' + Math.floor(Math.random() * 10000);
     
-    // 强制切换页面，不管眼动库死活，绝不卡死！
     dom.welcome.classList.add('hidden'); 
     dom.calib.classList.remove('hidden');
     setupCalibration();
 
     try {
         dom.btnStart.innerText = "请求摄像头...";
-
-        // 👇👇👇 核心配置：指定本地模型路径 👇👇👇
-        if (window.webgazer && window.webgazer.params) {
-            if (!window.webgazer.params.blazeFace) window.webgazer.params.blazeFace = {};
-            window.webgazer.params.blazeFace.modelUrl = 'models/blazeface/model.json';
-            
-            if (!window.webgazer.params.faceMesh) window.webgazer.params.faceMesh = {};
-            window.webgazer.params.faceMesh.modelUrl = 'models/facemesh/model.json';
+        // 强制覆盖路径到 CDN
+        if (window.webgazer && window.webgazer.params && window.webgazer.params.faceMesh) {
+            window.webgazer.params.faceMesh.modelUrl = "https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh@0.0.5/dist/model.json";
         }
-        // 👆👆👆 核心配置结束 👆👆👆
 
         webgazer.showVideoPreview(false).showPredictionPoints(false);
         if (typeof webgazer.applyKalmanFilter === 'function') webgazer.applyKalmanFilter(true);
@@ -89,10 +82,11 @@ dom.btnStart.addEventListener('click', async () => {
                 gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; 
                 gazeTimestamp = performance.now(); 
             }
-        }).begin(); 
+        }).begin().catch(err => {
+            console.warn("眼动仪初始化崩溃，但实验继续：", err);
+        });
     } catch (err) { 
-        // 这里的 catch 绝对不能漏！
-        console.warn("眼动仪初始化失败，但实验将继续进行。", err); 
+        console.warn("眼动仪初始化同步报错，但实验继续：", err); 
     }
 });
 
@@ -176,7 +170,6 @@ function startValidation() {
     const samples = [];
     const startTs = performance.now();
     
-    // 防卡死机制：如果拿不到数据自动跳过
     const globalTimeout = setTimeout(() => {
         if (samples.length === 0) {
             clearInterval(interval);
