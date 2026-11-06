@@ -84,3 +84,30 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     opacity: 0 !important;
     z-index: -9999 !important;
 }
+/* 允许全屏层滚动，避免验证页按钮被挤出视口 */
+.fullscreen-overlay {
+    overflow-y: auto;
+}
+
+/* 防止 flex 压缩实验/校准/验证区域 */
+#calibration-area, #exp1-stage {
+    flex-shrink: 0;
+}
+
+/* 验证区适当降低高度，保证结果和按钮可见 */
+#validation-area {
+    height: 55vh;
+    flex-shrink: 0;
+}
+
+.val-result-box {
+    text-align: center;
+    margin: 8px 0;
+    max-width: 760px;
+    width: 90%;
+}
+
+.val-result-box h2 {
+    font-size: 1.25rem;
+    margin-bottom: 6px;
+}
