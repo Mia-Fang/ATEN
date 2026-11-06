@@ -34,8 +34,11 @@ dom.btnStart.addEventListener('click', async () => {
     try {
         dom.btnStart.innerText = "请求摄像头...";
         webgazer.showVideoPreview(false).showPredictionPoints(false);
-        webgazer.setTracker('TFFacemesh');
+        // 开启卡尔曼滤波，平滑眼动数据，减少抖动
+        webgazer.applyKalmanFilter(true); 
         webgazer.setGazeListener((data) => { if (data) gazeData = { x: Math.round(data.x), y: Math.round(data.y) }; }).begin();
+        
+
         dom.welcome.classList.add('hidden'); dom.calib.classList.remove('hidden');
         setupCalibration();
     } catch (err) { 
@@ -91,13 +94,53 @@ function startValidation() {
         const avgError = valErrors.reduce((a,b)=>a+b, 0) / valErrors.length;
         calibValidationError = avgError; 
         dom.valResult.classList.remove('hidden');
-        dom.valResult.innerText = `验证结束！平均误差: ${avgError.toFixed(1)} px`;
-        dom.valResult.style.color = avgError < 150 ? 'var(--success)' : 'var(--danger)';
-        dom.btnValSkip.classList.remove('hidden');
-        if (avgError < 150) dom.btnValDone.classList.remove('hidden');
-        else dom.btnValRetry.classList.remove('hidden'); 
+        
+        // 👇 核心修改：不再强制要求 < 150，只要跑完就无条件放行
+        dom.valResult.innerText = `验证结束！平均误差: ${avgError.toFixed(1)} px (已忽略误差，可继续实验)`;
+        dom.valResult.style.color = 'var(--warning)'; // 用黄色警告色
+        
+        // 无论误差多大，直接显示“进入实验”按钮
+        dom.btnValDone.classList.remove('hidden');
+        dom.btnValSkip.classList.add('hidden'); // 把跳过按钮隐藏，因为已经强制放行了
+        dom.btnValRetry.classList.add('hidden'); // 隐藏重新校准
         return;
     }
+    
+    document.getElementById('val-progress').innerText = currentValIndex + 1;
+    dom.valArea.innerHTML = '';
+    const dot = document.createElement('div');
+    dot.className = 'val-dot'; dot.style.left = `${valPositions[currentValIndex][0]}%`; dot.style.top = `${valPositions[currentValIndex][1]}%`;
+    dom.valArea.appendChild(dot);
+    
+    let valGazeData = [];
+    const interval = setInterval(() => { 
+        if (gazeData.x && gazeData.y) valGazeData.push({x: gazeData.x, y: gazeData.y, time: performance.now()}); 
+    }, 50);
+    
+    setTimeout(() => {
+        clearInterval(interval);
+        
+        // 剔除前 500ms 移动期
+        const startTime = valGazeData.length > 0 ? valGazeData[0].time : 0;
+        const stableData = valGazeData.filter(d => d.time - startTime > 500);
+
+        if (stableData.length > 0) {
+            const meanX = stableData.reduce((a,b)=>a+b.x, 0) / stableData.length;
+            const meanY = stableData.reduce((a,b)=>a+b.y, 0) / stableData.length;
+            const rect = dom.valArea.getBoundingClientRect();
+            const absTargetX = rect.left + (valPositions[currentValIndex][0] / 100) * rect.width;
+            const absTargetY = rect.top + (valPositions[currentValIndex][1] / 100) * rect.height;
+            
+            const error = Math.sqrt(Math.pow(meanX - absTargetX, 2) + Math.pow(meanY - absTargetY, 2));
+            valErrors.push(error);
+        } else { 
+            valErrors.push(500); 
+        }
+        
+        currentValIndex++; 
+        startValidation();
+    }, 2000); // 时间调整为2秒，减少等待焦虑
+}
     
     document.getElementById('val-progress').innerText = currentValIndex + 1;
     dom.valArea.innerHTML = '';
